@@ -84,7 +84,7 @@
     <label for="s-cm">Pico: wake within</label><input id="s-cm" type="range" min="30" max="250" step="5"><span class="readout" id="r-cm"></span>
     <label for="s-face">Camera: face size to wake</label><input id="s-face" type="range" min="0.03" max="0.25" step="0.005"><span class="readout" id="r-face"></span>
     <label for="s-cool">Quiet time after a chat</label><input id="s-cool" type="range" min="5" max="90" step="5"><span class="readout" id="r-cool"></span>
-    <label for="s-leave">Hang up when nobody for</label><input id="s-leave" type="range" min="5" max="60" step="5"><span class="readout" id="r-leave"></span>
+    <label for="s-leave">Hang up when nobody for</label><input id="s-leave" type="range" min="15" max="90" step="5"><span class="readout" id="r-leave"></span>
     <span>Sensor right now</span><span></span><span class="readout" id="r-now">–</span>
     <span>Mic test</span><div id="meterbox"><div id="meter"></div></div><span class="readout" id="r-mic">off</span>
   </div>
@@ -120,11 +120,14 @@ const $ = (id) => document.getElementById(id);
 
 // ---------------------------------------------------------------- settings
 const settings = Object.assign(
-  { name: DEFAULTS.skeleton_name, scare: Number(DEFAULTS.scare_level) || 2, detector: "pico", wakeCm: 120, faceClose: 0.07, cooldown: 20, leave: 15 },
+  { name: DEFAULTS.skeleton_name, scare: Number(DEFAULTS.scare_level) || 2, detector: "pico", wakeCm: 120, faceClose: 0.07, cooldown: 20, leave: 30 },
   readStore(),
 );
+function migrate() { if (!settings.v3) { settings.leave = Math.max(settings.leave, 30); settings.v3 = 1; saveStore(); } }
 function readStore() { try { return JSON.parse(localStorage.getItem("skeleton2") || "{}"); } catch { return {}; } }
 function saveStore() { try { localStorage.setItem("skeleton2", JSON.stringify(settings)); } catch {} }
+
+migrate();
 
 // ---------------------------------------------------------------- ui + log
 const logLines = [];
@@ -326,7 +329,8 @@ function readPresence(now) {
     const dist = pico.cm == null ? "nothing in range" : `${pico.cm} cm`;
     const rule = sonar.threshold == null ? "learning the empty porch…"
       : `wakes under ${sonar.threshold} cm (empty: ${sonar.background >= 400 ? "open space" : sonar.background + " cm"})`;
-    return { close: on, seen: on, hold: 1, readout: `Pico: ${dist} · ${rule}${on ? " · someone here" : ""}` };
+    const around = on || (pico.cm != null && sonar.background != null && pico.cm < sonar.background - 10);
+    return { close: on, seen: around, hold: 1, readout: `Pico: ${dist} · ${rule}${on ? " · someone here" : ""}` };
   }
   if (cam.on && cam.detector) {
     const size = cam.faceSize();
@@ -378,6 +382,7 @@ function onMode(mode) {
     setPhase("speaking");
   } else {
     setPhase("listening");
+    app.listeningSince = Date.now();
     app.unmuteTimer = setTimeout(() => { app.micMuted = false; applyMute(); }, ECHO_TAIL_MS);
   }
 }
@@ -483,8 +488,11 @@ function tick() {
   }
 
   if (app.conversation) {
-    if (now - app.lastSeen > settings.leave * 1000) hangUp("nobody there");
-    else if (now - app.callStarted > MAX_CALL_MS) hangUp("call too long");
+    // Ending calls is the agent's job (goodbye, or 12 s of silence). This is only a safety net, and it
+    // never cuts the skeleton off: it waits until it has finished talking and the visitor had time to answer.
+    const quiet = app.phase === "listening" && now - app.listeningSince > 8000;
+    if (quiet && now - app.lastSeen > settings.leave * 1000) hangUp("nobody around for " + settings.leave + " s");
+    else if (quiet && now - app.callStarted > MAX_CALL_MS) hangUp("call too long");
     else if (app.micMuted && now - app.mutedSince > 25000 && app.phase !== "speaking") { app.micMuted = false; applyMute(); note("mic re-opened by watchdog"); }
     return;
   }
