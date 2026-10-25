@@ -110,7 +110,8 @@ $("arm").onclick = async () => {
     mic.getTracks().forEach((t) => t.stop());                     // permission granted; the SDK opens its own
     say("asking for camera…");
     video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
-    await video.play();
+    await new Promise((r) => { if (video.readyState >= 2) r(); else video.onloadeddata = r; });
+    video.play().catch(() => {});                                  // autoplay already started it; ignore the race
     await keepAwake();
     try { await document.documentElement.requestFullscreen(); } catch {}
     $("arm").hidden = true;
