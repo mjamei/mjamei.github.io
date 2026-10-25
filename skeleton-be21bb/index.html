@@ -4,16 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#000000">
-<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
 <title>Porch Skeleton</title>
 <style>
-  :root { --glow: #ff7a1a; --dim: #3a2410; --fg: #e9e2d3; }
-  html, body { height: 100%; margin: 0; background: #000; color: var(--fg); font: 600 18px/1.3 system-ui, sans-serif; overflow: hidden; -webkit-user-select: none; user-select: none; }
-  #stage { height: 100%; display: grid; grid-template-rows: 1fr auto auto; place-items: center; padding: 2vh 4vw; box-sizing: border-box; }
-  #skull { width: min(62vmin, 520px); height: auto; }
+  :root { --glow: #ff7a1a; --dim: #3a2410; --fg: #e9e2d3; --muted: #9a9184; --ok: #6fcf7f; --warn: #e8bb4c; --bad: #ef6a5b; --panel: #15121c; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #000; color: var(--fg); font: 600 18px/1.35 system-ui, sans-serif; overflow: hidden; -webkit-user-select: none; user-select: none; }
+  #stage { height: 100%; display: grid; grid-template-rows: 1fr auto auto auto auto; justify-items: center; align-items: center; gap: 1.2vh; padding: 2vh 4vw 3vh; }
+  #skull { width: min(56vmin, 480px); height: auto; }
   #skull .eye { fill: var(--dim); transition: fill .25s; }
   #skull .jaw { transform-origin: 50% 0; }
-  body[data-state="sleeping"] .eye { animation: breathe 3.6s ease-in-out infinite; }
+  body[data-state="sleeping"] .eye, body[data-state="needs-tap"] .eye { animation: breathe 3.6s ease-in-out infinite; }
   body[data-state="connecting"] .eye { fill: #b35a10; animation: flicker .18s steps(2) infinite; }
   body[data-state="listening"] .eye { fill: var(--glow); }
   body[data-state="speaking"] .eye { fill: #ffb060; animation: talkglow .5s ease-in-out infinite; }
@@ -22,23 +24,31 @@
   @keyframes flicker { 0% { opacity: .5; } 100% { opacity: 1; } }
   @keyframes talkglow { 0%,100% { fill: #ffb060; } 50% { fill: #ff6a00; } }
   @keyframes chatter { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
-  #status { font-size: clamp(16px, 2.6vmin, 24px); color: #9a9184; text-align: center; min-height: 1.4em; }
-  #arm { font-size: clamp(20px, 4vmin, 34px); font-weight: 800; padding: .6em 1.4em; border: 0; border-radius: 14px; background: var(--glow); color: #1a1206; margin-top: 1.5vh; }
-  #arm[hidden] { display: none; }
+  #status { font-size: clamp(18px, 3vmin, 28px); text-align: center; }
+  #sensor { font-size: clamp(14px, 2vmin, 18px); color: var(--muted); font-variant-numeric: tabular-nums; }
+  #banner { max-width: 46em; text-align: center; font-size: clamp(16px, 2.4vmin, 22px); color: #1a0d0a; background: var(--bad); border-radius: 12px; padding: .6em 1em; }
+  #banner.action { cursor: pointer; text-decoration: underline; }
+  #chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .chip { font-size: 14px; padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor; color: var(--muted); }
+  .chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
+  #start { font-size: clamp(22px, 4.2vmin, 38px); font-weight: 800; padding: .7em 1.6em; border: 0; border-radius: 16px; background: var(--glow); color: #1a1206; }
+  #gear { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); font-size: 28px; background: transparent; color: #6b6458; border: 0; padding: 8px; }
   video { position: fixed; left: -9999px; width: 2px; height: 2px; }
-  #panel { position: fixed; inset: auto 0 0 0; max-height: 78vh; overflow: auto; background: #15121c; border-top: 2px solid var(--glow); padding: 14px 16px 24px; font-size: 16px; }
-  #panel[hidden] { display: none; }
-  #panel h2 { margin: 0 0 8px; font-size: 18px; color: var(--glow); }
-  #panel label { display: grid; grid-template-columns: 1fr 2fr auto; gap: 10px; align-items: center; padding: 6px 0; }
+  [hidden] { display: none !important; }
+  #panel { position: fixed; inset: auto 0 0 0; max-height: 86vh; overflow: auto; background: var(--panel); border-top: 2px solid var(--glow); padding: 14px 18px 24px; font-size: 16px; -webkit-user-select: text; user-select: text; }
+  #panel h2 { margin: 0 0 6px; font-size: 18px; color: var(--glow); }
+  #panel .grid { display: grid; grid-template-columns: minmax(10em, 1fr) 2fr minmax(6em, auto); gap: 8px 12px; align-items: center; }
   #panel input[type=range] { width: 100%; }
-  #panel input[type=text] { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid #444; background: #000; color: var(--fg); }
-  #panel .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  #panel input[type=text], #panel select { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid #444; background: #000; color: var(--fg); }
+  #panel .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   #panel button { font: inherit; font-weight: 700; padding: 8px 14px; border-radius: 8px; border: 1px solid #666; background: #222; color: var(--fg); }
-  #log { font: 12px/1.35 ui-monospace, monospace; color: #8f877a; white-space: pre-wrap; max-height: 22vh; overflow: auto; margin-top: 10px; }
-  .readout { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
+  .readout { font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
+  #meterbox { height: 12px; background: #000; border: 1px solid #444; border-radius: 6px; overflow: hidden; }
+  #meter { height: 100%; width: 0; background: var(--ok); transition: width .08s; }
+  #log { font: 12px/1.35 ui-monospace, monospace; color: #8f877a; white-space: pre-wrap; max-height: 24vh; overflow: auto; margin-top: 12px; }
 </style>
 </head>
-<body data-state="off">
+<body data-state="booting">
 <main id="stage">
   <svg id="skull" viewBox="0 0 120 130" role="img" aria-label="Skull">
     <path d="M60 10c-26 0-44 18-44 42 0 14 6 24 14 30v14c0 4 3 6 6 6h6v-8h8v8h12v-8h8v8h6c3 0 6-2 6-6V82c8-6 14-16 14-30 0-24-18-42-36-42z" fill="#0b0b0e" stroke="#e9e2d3" stroke-width="3" stroke-linejoin="round"/>
@@ -50,21 +60,40 @@
       <path d="M48 104v8M56 104v8M64 104v8M72 104v8" stroke="#e9e2d3" stroke-width="2.5"/>
     </g>
   </svg>
-  <div id="status">tap to arm</div>
-  <button id="arm">ARM THE SKELETON</button>
+  <div id="status">starting…</div>
+  <div id="sensor"></div>
+  <div id="banner" hidden></div>
+  <div id="chips">
+    <span class="chip" id="c-voice">voice</span>
+    <span class="chip" id="c-mic">mic</span>
+    <span class="chip" id="c-sensor">sensor</span>
+    <span class="chip" id="c-net">internet</span>
+  </div>
+  <button id="start" hidden>TAP TO WAKE THE SKELETON</button>
 </main>
+<button id="gear" aria-label="Settings">⚙</button>
 
 <aside id="panel" hidden>
   <h2>Skeleton settings</h2>
-  <label>Name <input id="s-name" type="text"> <span></span></label>
-  <label>Scare level <input id="s-scare" type="range" min="1" max="5" step="1"> <span class="readout" id="r-scare"></span></label>
-  <label>Wake when face is this big <input id="s-close" type="range" min="0.03" max="0.25" step="0.005"> <span class="readout" id="r-close"></span></label>
-  <label>Face size right now <span></span> <span class="readout" id="r-now">–</span></label>
-  <label>Quiet time after a chat (s) <input id="s-cool" type="range" min="5" max="90" step="5"> <span class="readout" id="r-cool"></span></label>
-  <label>Hang up when nobody is seen for (s) <input id="s-leave" type="range" min="5" max="60" step="5"> <span class="readout" id="r-leave"></span></label>
+  <div class="grid">
+    <label for="s-name">Name</label><input id="s-name" type="text"><span></span>
+    <label for="s-scare">Scare level</label><input id="s-scare" type="range" min="1" max="5" step="1"><span class="readout" id="r-scare"></span>
+    <label for="s-det">Detector</label>
+    <select id="s-det"><option value="pico">Pico sensor (USB)</option><option value="camera">Tablet camera</option></select>
+    <span class="readout" id="r-pico"></span>
+    <label for="s-cm">Pico: wake within</label><input id="s-cm" type="range" min="30" max="250" step="5"><span class="readout" id="r-cm"></span>
+    <label for="s-face">Camera: face size to wake</label><input id="s-face" type="range" min="0.03" max="0.25" step="0.005"><span class="readout" id="r-face"></span>
+    <label for="s-cool">Quiet time after a chat</label><input id="s-cool" type="range" min="5" max="90" step="5"><span class="readout" id="r-cool"></span>
+    <label for="s-leave">Hang up when nobody for</label><input id="s-leave" type="range" min="5" max="60" step="5"><span class="readout" id="r-leave"></span>
+    <span>Sensor right now</span><span></span><span class="readout" id="r-now">–</span>
+    <span>Mic test</span><div id="meterbox"><div id="meter"></div></div><span class="readout" id="r-mic">off</span>
+  </div>
   <div class="row">
+    <button id="b-pico">Connect Pico</button>
     <button id="b-talk">Talk now</button>
     <button id="b-hang">Hang up</button>
+    <button id="b-mic">Mic test</button>
+    <button id="b-reload">Reload app</button>
     <button id="b-close">Close</button>
   </div>
   <div id="log"></div>
@@ -73,199 +102,495 @@
 <video id="cam" autoplay muted playsinline></video>
 
 <script type="module">
-import { Conversation } from "https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.30.0/+esm";
 import { AGENT_ID, DEFAULTS } from "./config.js";
 
-const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21";
+const SDK_URL = "https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.30.0/+esm";
+const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
-const HOLD_FRAMES = 3;          // consecutive "close" detections before waking (about half a second)
-const FPS = 6;
+const PICO_VENDOR = 0x2e8a;
+const TICK_MS = 160;
+const ECHO_TAIL_MS = 450;          // keep the mic shut this long after the skeleton stops talking
+const CONNECT_TIMEOUT_MS = 20000;
+const MAX_CALL_MS = 200000;
+const FRESH_ARRIVAL_MS = 2000;     // after a chat, nobody must be seen this long before the next wake
+const FRESH_ARRIVAL_MAX_MS = 60000;
+const EYE_FOR = { booting: "sleep", "needs-tap": "sleep", sleeping: "sleep", connecting: "wake", listening: "listen", speaking: "speak" };
 
 const $ = (id) => document.getElementById(id);
-const body = document.body, status = $("status"), video = $("cam"), log = $("log");
 
-// ---- settings (persisted on this tablet) -------------------------------------------
-const settings = Object.assign({
-  name: DEFAULTS.skeleton_name, scare: Number(DEFAULTS.scare_level) || 2,
-  close: 0.07, cooldown: 20, leave: 15,
-}, readStore());
-function readStore() { try { return JSON.parse(localStorage.getItem("skeleton") || "{}"); } catch { return {}; } }
-function saveStore() { try { localStorage.setItem("skeleton", JSON.stringify(settings)); } catch {} }
+// ---------------------------------------------------------------- settings
+const settings = Object.assign(
+  { name: DEFAULTS.skeleton_name, scare: Number(DEFAULTS.scare_level) || 2, detector: "pico", wakeCm: 120, faceClose: 0.07, cooldown: 20, leave: 15 },
+  readStore(),
+);
+function readStore() { try { return JSON.parse(localStorage.getItem("skeleton2") || "{}"); } catch { return {}; } }
+function saveStore() { try { localStorage.setItem("skeleton2", JSON.stringify(settings)); } catch {} }
 
-function say(msg) { status.textContent = msg; }
+// ---------------------------------------------------------------- ui + log
+const logLines = [];
 function note(msg) {
   const line = `${new Date().toLocaleTimeString()}  ${msg}`;
   console.log("[skeleton]", msg);
-  log.textContent = (line + "\n" + log.textContent).slice(0, 4000);
+  logLines.unshift(line); logLines.length = Math.min(logLines.length, 80);
+  $("log").textContent = logLines.join("\n");
 }
-function setState(s) { body.dataset.state = s; }
-
-// ---- arming: permissions, camera, wake lock, detector ----------------------------
-let detector = null, armed = false, wakeLock = null;
-
-$("arm").onclick = async () => {
-  try {
-    say("asking for microphone…");
-    const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mic.getTracks().forEach((t) => t.stop());                     // permission granted; the SDK opens its own
-    say("asking for camera…");
-    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
-    await new Promise((r) => { if (video.readyState >= 2) r(); else video.onloadeddata = r; });
-    video.play().catch(() => {});                                  // autoplay already started it; ignore the race
-    await keepAwake();
-    try { await document.documentElement.requestFullscreen(); } catch {}
-    $("arm").hidden = true;
-    say("loading eyes…");
-    await loadDetector();
-    armed = true;
-    setState("sleeping");
-    say("watching the porch…");
-    note(`armed. agent ${AGENT_ID.slice(0, 8)}…, detector ${detector ? "face" : "motion"}`);
-    setInterval(tick, 1000 / FPS);
-  } catch (e) {
-    say("could not arm: " + (e.message || e));
-    note("arm failed: " + e);
-  }
+const ui = {
+  status(t) { $("status").textContent = t; },
+  sensor(t) { $("sensor").textContent = t; },
+  banner(text, action) {
+    const b = $("banner"); b.textContent = text || ""; b.hidden = !text;
+    b.classList.toggle("action", !!action); b.onclick = action || null;
+  },
+  chip(id, text, level) { const c = $("c-" + id); c.textContent = text; c.className = "chip " + (level || ""); },
 };
 
-async function keepAwake() {
-  try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) { note("no wake lock: " + e.message); }
-}
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && armed) keepAwake(); });
+// ---------------------------------------------------------------- app state
+const app = {
+  phase: "booting", armed: false, sdk: null, conversation: null, starting: false,
+  busyUntil: 0, failures: 0, lastSeen: 0, closeStreak: 0, callStarted: 0,
+  needFresh: false, freshSince: 0, freshSetAt: 0,
+  micMuted: true, mutedSince: 0, unmuteTimer: 0, ticker: 0, voiceProblem: "",
+};
 
-async function loadDetector() {
+function setPhase(p) {
+  app.phase = p; document.body.dataset.state = p;
+  pico.eyes(EYE_FOR[p] || "sleep", true);
+  const name = settings.name;
+  const text = { booting: "starting…", "needs-tap": "tap to wake the skeleton", sleeping: "watching the porch…", connecting: "someone's here…", listening: `${name} is listening`, speaking: `${name} is talking` }[p];
+  if (text) ui.status(text);
+}
+
+// ---------------------------------------------------------------- Pico over WebUSB
+const pico = {
+  dev: null, epIn: 0, epOut: 0, connected: false, on: false, cm: null, lastMsg: 0, lastTry: 0, version: "", lastEyes: "", lastEyesAt: 0, opening: false,
+  async connect(prompt) {
+    if (!navigator.usb) throw new Error("this browser has no WebUSB");
+    if (this.connected || this.opening) return this.connected;
+    let dev = (await navigator.usb.getDevices()).find((d) => d.vendorId === PICO_VENDOR);
+    if (!dev && prompt) dev = await navigator.usb.requestDevice({ filters: [{ vendorId: PICO_VENDOR }] });
+    if (!dev) return false;
+    await this.open(dev);
+    return true;
+  },
+  async open(dev) {
+    if (this.connected || this.opening) return;
+    this.opening = true;
+    try {
+      if (!dev.opened) await dev.open();
+      if (!dev.configuration) await dev.selectConfiguration(1);
+      const ifs = dev.configuration.interfaces;
+      const data = ifs.find((i) => i.alternates[0].interfaceClass === 0x0a);
+      const ctrl = ifs.find((i) => i.alternates[0].interfaceClass === 0x02);
+      if (!data) throw new Error("the Pico has no serial port (is MicroPython installed?)");
+      if (ctrl) { try { await dev.claimInterface(ctrl.interfaceNumber); } catch (e) { note("Pico control claim: " + e.message); } }
+      await dev.claimInterface(data.interfaceNumber);
+      const eps = data.alternates[0].endpoints;
+      this.epIn = eps.find((e) => e.direction === "in").endpointNumber;
+      this.epOut = eps.find((e) => e.direction === "out").endpointNumber;
+      if (ctrl) {   // DTR+RTS tells MicroPython a terminal is attached (never touch baud: 1200 would reboot it)
+        try { await dev.controlTransferOut({ requestType: "class", recipient: "interface", request: 0x22, value: 0x03, index: ctrl.interfaceNumber }); }
+        catch (e) { note("Pico DTR: " + e.message); }
+      }
+      this.dev = dev; this.connected = true; this.lastMsg = Date.now();
+      note("Pico connected");
+      this.readLoop(dev);
+      await this.send("hello");
+      await this.send("wake " + settings.wakeCm);
+      this.eyes(EYE_FOR[app.phase] || "sleep", true);
+    } finally {
+      this.opening = false;
+      refreshHealth();
+    }
+  },
+  async readLoop(dev) {
+    const dec = new TextDecoder(); let buf = "";
+    while (this.connected && this.dev === dev) {
+      let r;
+      try { r = await dev.transferIn(this.epIn, 64); }
+      catch (e) { this.lost("read failed: " + e.message); return; }
+      if (r.status === "stall") { try { await dev.clearHalt("in", this.epIn); } catch {} continue; }
+      if (!r.data || !r.data.byteLength) continue;
+      buf += dec.decode(r.data, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+        if (line[0] === "{") this.onLine(line);
+      }
+      if (buf.length > 4000) buf = "";
+    }
+  },
+  onLine(line) {
+    let m; try { m = JSON.parse(line); } catch { return; }
+    this.lastMsg = Date.now();
+    if (m.hello) { this.version = m.v; note(`Pico firmware ${m.v}, wakes within ${m.wake} cm`); }
+    if ("on" in m) { this.on = !!m.on; this.cm = m.cm; }
+    if (m.err) note("Pico error: " + m.err);
+  },
+  async send(text) {
+    if (!this.connected) return;
+    try { await this.dev.transferOut(this.epOut, new TextEncoder().encode(text + "\n")); }
+    catch (e) { this.lost("write failed: " + e.message); }
+  },
+  eyes(mode, force) {   // re-sent every few seconds so the Pico knows the tablet is alive
+    if (!this.connected) return;
+    if (force || mode !== this.lastEyes || Date.now() - this.lastEyesAt > 4000) {
+      this.lastEyes = mode; this.lastEyesAt = Date.now(); this.send("eyes " + mode);
+    }
+  },
+  lost(why) {
+    if (!this.connected) return;
+    this.connected = false; this.on = false; this.cm = null;
+    note("Pico lost: " + why);
+    try { this.dev && this.dev.close(); } catch {}
+    this.dev = null;
+    refreshHealth();
+  },
+};
+if (navigator.usb) {
+  navigator.usb.addEventListener("connect", (e) => {
+    if (e.device.vendorId === PICO_VENDOR && app.armed && !pico.connected) pico.open(e.device).catch((err) => note("Pico open: " + err.message));
+  });
+  navigator.usb.addEventListener("disconnect", (e) => { if (pico.dev === e.device) pico.lost("unplugged"); });
+}
+
+// ---------------------------------------------------------------- camera fallback
+const cam = {
+  on: false, detector: null, last: null,
+  canvas: Object.assign(document.createElement("canvas"), { width: 32, height: 24 }),
+  async start() {
+    if (this.on) return;
+    const video = $("cam");
+    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
+    await new Promise((r) => { if (video.readyState >= 2) r(); else video.onloadeddata = r; });
+    video.play().catch(() => {});
+    this.on = true;
+    try {
+      const { FaceDetector, FilesetResolver } = await import(MP_URL + "/vision_bundle.mjs");
+      const vision = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
+      this.detector = await FaceDetector.createFromOptions(vision, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: "GPU" }, runningMode: "VIDEO", minDetectionConfidence: 0.5 });
+      note("camera face detection ready");
+    } catch (e) { note("face detection unavailable, using motion: " + e.message); }
+  },
+  stop() {
+    const video = $("cam");
+    (video.srcObject?.getTracks() || []).forEach((t) => t.stop());
+    video.srcObject = null; this.on = false;
+  },
+  faceSize() {
+    const video = $("cam");
+    if (!this.detector || !video.videoWidth) return 0;
+    let best = 0;
+    for (const d of this.detector.detectForVideo(video, performance.now()).detections || []) best = Math.max(best, d.boundingBox.width / video.videoWidth);
+    return best;
+  },
+  motion() {
+    const video = $("cam"); if (!video.videoWidth) return 0;
+    const ctx = this.canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, 32, 24);
+    const f = ctx.getImageData(0, 0, 32, 24).data;
+    let diff = 0;
+    if (this.last) for (let i = 0; i < f.length; i += 4) diff += Math.abs(f[i] - this.last[i]);
+    this.last = f;
+    return diff / (f.length / 4);
+  },
+};
+
+// ---------------------------------------------------------------- presence
+function readPresence(now) {
+  if (pico.connected) {
+    const fresh = now - pico.lastMsg < 3000;
+    const on = fresh && pico.on;
+    const where = !fresh ? "Pico is silent" : pico.cm == null ? "nobody in range" : `${pico.cm} cm`;
+    return { close: on, seen: on, hold: 1, readout: `Pico: ${where}${on ? " · someone here" : ""}` };
+  }
+  if (cam.on && cam.detector) {
+    const size = cam.faceSize();
+    return { close: size >= settings.faceClose, seen: size > 0.02, hold: 3, readout: `camera: face size ${size.toFixed(3)}` };
+  }
+  if (cam.on) {
+    const m = cam.motion();
+    return { close: m > 25, seen: m > 25, hold: 3, readout: `camera: motion ${m.toFixed(1)}` };
+  }
+  if (settings.detector === "pico" && now - pico.lastTry > 3000) {
+    pico.lastTry = now;
+    pico.connect(false).catch(() => {});
+  }
+  return { close: false, seen: false, hold: 99, readout: settings.detector === "pico" ? "Pico not connected" : "camera off" };
+}
+
+// ---------------------------------------------------------------- voice
+async function loadSdk() {
+  if (app.sdk) return true;
   try {
-    const { FaceDetector, FilesetResolver } = await import(MP + "/vision_bundle.mjs");
-    const vision = await FilesetResolver.forVisionTasks(MP + "/wasm");
-    detector = await FaceDetector.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: FACE_MODEL, delegate: "GPU" },
-      runningMode: "VIDEO", minDetectionConfidence: 0.5,
-    });
+    app.sdk = await import(SDK_URL + (app.sdkTries ? `?retry=${app.sdkTries}` : ""));
+    return true;
   } catch (e) {
-    note("face detector unavailable, using motion: " + e.message);
-    detector = null;
+    app.sdkTries = (app.sdkTries || 0) + 1;
+    app.voiceProblem = "Could not load the voice library. Check the Wi-Fi; retrying.";
+    note("voice library: " + e.message);
+    setTimeout(loadSdk, 15000);
+    refreshHealth();
+    return false;
   }
 }
 
-// ---- presence loop -----------------------------------------------------------------
-const canvas = document.createElement("canvas"); canvas.width = 32; canvas.height = 24;
-const ctx = canvas.getContext("2d", { willReadFrequently: true });
-let lastFrame = null, closeStreak = 0, lastSeen = 0, busyUntil = 0, conversation = null, starting = false;
+function classify(err) {
+  const m = String(err?.message || err || "");
+  if (/quota|credit/i.test(m)) return { chip: "no credits", retryMs: 120000, text: "ElevenLabs is out of credits. Upgrade the plan or add credits; the skeleton retries by itself every 2 minutes." };
+  if (/NotAllowed|Permission|denied/i.test(m)) return { chip: "mic blocked", retryMs: 30000, text: "The microphone is blocked for this page. Allow it in Chrome's site settings, then reload." };
+  if (!navigator.onLine || /network|websocket|fetch|timeout|closed/i.test(m)) return { chip: "can't connect", retryMs: Math.min(60000, 10000 * 2 ** app.failures), text: "Can't reach ElevenLabs. Check the Wi-Fi; retrying." };
+  return { chip: "voice error", retryMs: Math.min(120000, 15000 * 2 ** app.failures), text: "Voice error: " + m.slice(0, 140) };
+}
 
-function faceSize() {
-  if (!detector || !video.videoWidth) return null;
-  const res = detector.detectForVideo(video, performance.now());
-  let best = 0;
-  for (const d of res.detections || []) {
-    const w = d.boundingBox.width / video.videoWidth;
-    if (w > best) best = w;
+function applyMute() {
+  if (!app.conversation) return;
+  try { app.conversation.setMicMuted(app.micMuted); } catch (e) { note("mute failed: " + e.message); }
+}
+function onMode(mode) {
+  clearTimeout(app.unmuteTimer);
+  if (mode === "speaking") {
+    if (!app.micMuted) { app.micMuted = true; app.mutedSince = Date.now(); applyMute(); }
+    setPhase("speaking");
+  } else {
+    setPhase("listening");
+    app.unmuteTimer = setTimeout(() => { app.micMuted = false; applyMute(); }, ECHO_TAIL_MS);
   }
-  return best;
+}
+function onEnded(details) {
+  if (!app.conversation && !app.starting) return;
+  app.conversation = null;
+  clearTimeout(app.unmuteTimer);
+  app.busyUntil = Math.max(app.busyUntil, Date.now() + settings.cooldown * 1000);
+  app.needFresh = true; app.freshSince = 0; app.freshSetAt = Date.now();
+  note("call ended" + (details?.reason ? ` (${details.reason})` : ""));
+  setPhase("sleeping");
 }
 
-function motionScore() {
-  if (!video.videoWidth) return 0;
-  ctx.drawImage(video, 0, 0, 32, 24);
-  const f = ctx.getImageData(0, 0, 32, 24).data;
-  let diff = 0;
-  if (lastFrame) for (let i = 0; i < f.length; i += 4) diff += Math.abs(f[i] - lastFrame[i]);
-  lastFrame = f;
-  return diff / (f.length / 4);
+async function wake(reason) {
+  if (app.conversation || app.starting) return;
+  if (!(await loadSdk())) return;
+  app.starting = true; app.closeStreak = 0; app.lastSeen = Date.now();
+  app.micMuted = true; app.mutedSince = Date.now();
+  setPhase("connecting");
+  note("wake: " + reason);
+  const startPromise = app.sdk.Conversation.startSession({
+    agentId: AGENT_ID,
+    connectionType: "websocket",
+    dynamicVariables: { skeleton_name: settings.name, scare_level: String(settings.scare) },
+    onModeChange: ({ mode }) => onMode(mode),
+    onDisconnect: (details) => onEnded(details),
+    onError: (message) => note("voice error: " + message),
+  });
+  try {
+    const conv = await Promise.race([
+      startPromise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout connecting to ElevenLabs")), CONNECT_TIMEOUT_MS)),
+    ]);
+    app.conversation = conv; app.callStarted = Date.now();
+    applyMute();
+    app.failures = 0; app.voiceProblem = "";
+    note("connected");
+    refreshHealth();
+  } catch (e) {
+    startPromise.then((c) => { if (c && c !== app.conversation) c.endSession().catch(() => {}); }).catch(() => {});
+    const c = classify(e);
+    app.failures += 1;
+    app.busyUntil = Date.now() + c.retryMs;
+    app.voiceProblem = c.text; app.voiceChip = c.chip;
+    note("could not start: " + (e.message || e));
+    if (app.phase === "connecting") setPhase("sleeping");
+    refreshHealth();
+  } finally {
+    app.starting = false;
+  }
 }
 
+async function hangUp(why) {
+  const c = app.conversation;
+  if (!c) return;
+  note("hang up: " + why);
+  try { await c.endSession(); } catch (e) { note("hang up failed: " + e.message); }
+  if (app.conversation === c) onEnded({ reason: why });
+}
+
+// ---------------------------------------------------------------- health line
+async function refreshHealth() {
+  // voice
+  if (app.voiceProblem) ui.chip("voice", app.voiceChip || "voice problem", "bad");
+  else ui.chip("voice", app.sdk ? "voice ready" : "voice loading", app.sdk ? "ok" : "warn");
+  // mic
+  const mic = await permState("microphone");
+  ui.chip("mic", mic === "granted" ? "mic allowed" : mic === "denied" ? "mic blocked" : "mic not asked", mic === "granted" ? "ok" : mic === "denied" ? "bad" : "warn");
+  // sensor
+  if (pico.connected) ui.chip("sensor", `Pico ${pico.version || ""}`.trim(), "ok");
+  else if (cam.on) ui.chip("sensor", cam.detector ? "camera (face)" : "camera (motion)", "warn");
+  else ui.chip("sensor", settings.detector === "pico" ? "Pico not connected" : "camera off", "bad");
+  // internet
+  ui.chip("net", navigator.onLine ? "online" : "offline", navigator.onLine ? "ok" : "bad");
+  // the one banner that matters most
+  if (!navigator.onLine) ui.banner("The tablet is offline. Check the Wi-Fi.");
+  else if (mic === "denied") ui.banner("The microphone is blocked for this page. Allow it in Chrome's site settings, then reload.");
+  else if (app.voiceProblem) ui.banner(app.voiceProblem);
+  else if (app.armed && settings.detector === "pico" && !pico.connected && !cam.on) {
+    ui.banner("The Pico is not connected. Plug it into the tablet's USB-C port. Tap here if Chrome needs to be allowed to use it.", () => pairPico());
+  } else ui.banner("");
+}
+window.addEventListener("online", refreshHealth);
+window.addEventListener("offline", refreshHealth);
+
+async function permState(name) {
+  try { return (await navigator.permissions.query({ name })).state; } catch { return "unknown"; }
+}
+
+// ---------------------------------------------------------------- main loop
 function tick() {
   const now = Date.now();
-  let close;
-  if (detector) {
-    const size = faceSize();
-    $("r-now").textContent = size.toFixed(3);
-    close = size >= settings.close;
-    if (size > 0.02) lastSeen = now;              // any face at all counts as "someone is around"
-  } else {
-    const m = motionScore();
-    $("r-now").textContent = m.toFixed(1);
-    close = m > 25;
-    if (close) lastSeen = now;
+  const p = readPresence(now);
+  ui.sensor(p.readout);
+  $("r-now").textContent = p.readout;
+  if (p.seen) app.lastSeen = now;
+  pico.eyes(EYE_FOR[app.phase] || "sleep");
+
+  if (app.needFresh) {
+    if (!p.close) { app.freshSince ||= now; if (now - app.freshSince > FRESH_ARRIVAL_MS) app.needFresh = false; }
+    else app.freshSince = 0;
+    if (now - app.freshSetAt > FRESH_ARRIVAL_MAX_MS) app.needFresh = false;
   }
 
-  if (conversation || starting) {
-    if (now - lastSeen > settings.leave * 1000) { note("nobody seen, hanging up"); hangUp(); }
+  if (app.conversation) {
+    if (now - app.lastSeen > settings.leave * 1000) hangUp("nobody there");
+    else if (now - app.callStarted > MAX_CALL_MS) hangUp("call too long");
+    else if (app.micMuted && now - app.mutedSince > 25000 && app.phase !== "speaking") { app.micMuted = false; applyMute(); note("mic re-opened by watchdog"); }
     return;
   }
-  if (now < busyUntil) return;
-  closeStreak = close ? closeStreak + 1 : 0;
-  if (closeStreak >= HOLD_FRAMES) wake();
+  if (!app.armed || app.starting || now < app.busyUntil) return;
+  app.closeStreak = p.close ? app.closeStreak + 1 : 0;
+  if (app.closeStreak >= p.hold && !app.needFresh) wake(pico.connected ? "Pico sensor" : "camera");
 }
 
-// ---- the conversation ---------------------------------------------------------------
-async function wake() {
-  if (conversation || starting) return;
-  starting = true; closeStreak = 0; lastSeen = Date.now();
-  setState("connecting"); say("someone's here…");
+// ---------------------------------------------------------------- wake lock
+let wakeLock = null;
+async function keepAwake() {
+  if (document.visibilityState !== "visible") return;
   try {
-    conversation = await Conversation.startSession({
-      agentId: AGENT_ID,
-      connectionType: "websocket",
-      dynamicVariables: { skeleton_name: settings.name, scare_level: String(settings.scare) },
-      onConnect: () => { setState("listening"); say(`${settings.name} is awake`); note("connected"); },
-      onModeChange: ({ mode }) => { setState(mode === "speaking" ? "speaking" : "listening"); },
-      onDisconnect: () => {
-        conversation = null;
-        busyUntil = Date.now() + settings.cooldown * 1000;
-        setState("sleeping"); say("watching the porch…"); note("disconnected, cooling down");
-      },
-      onError: (err) => { note("error: " + (err?.message || JSON.stringify(err))); },
-    });
-  } catch (e) {
-    note("could not start: " + (e.message || e));
-    busyUntil = Date.now() + 10000;
-    setState("sleeping"); say("watching the porch…");
-  } finally {
-    starting = false;
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => setTimeout(keepAwake, 1000));
+  } catch (e) { note("screen wake lock: " + e.message); }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && app.armed) keepAwake(); });
+
+// ---------------------------------------------------------------- boot
+async function canPlaySound() {
+  try { const ac = new AudioContext(); const ok = ac.state === "running"; await ac.close(); return ok; } catch { return false; }
+}
+
+async function pairPico() {
+  try { await pico.connect(true); } catch (e) { note("Pico: " + (e.message || e)); }
+  refreshHealth();
+}
+
+async function boot(fromTap) {
+  $("start").hidden = true;
+  setPhase("booting");
+  if (fromTap) { try { await document.documentElement.requestFullscreen(); } catch {} }
+  loadSdk().then(refreshHealth);
+  if (settings.detector === "pico") {
+    try { await pico.connect(fromTap); } catch (e) { note("Pico: " + (e.message || e)); }
+  } else {
+    try { await cam.start(); } catch (e) { note("camera: " + e.message); }
   }
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    s.getTracks().forEach((t) => t.stop());
+  } catch (e) { note("microphone: " + e.message); }
+  keepAwake();
+  app.armed = true;
+  setPhase("sleeping");
+  if (!app.ticker) app.ticker = setInterval(tick, TICK_MS);
+  refreshHealth();
+  note(`armed (${fromTap ? "after tap" : "automatically"}), detector: ${pico.connected ? "Pico" : cam.on ? "camera" : "waiting for Pico"}`);
 }
 
-async function hangUp() {
-  if (!conversation) return;
-  const c = conversation; conversation = null;
-  try { await c.endSession(); } catch (e) { note("hangup error: " + e.message); }
-  busyUntil = Date.now() + settings.cooldown * 1000;
-  setState("sleeping"); say("watching the porch…");
+async function start() {
+  note("app loaded");
+  refreshHealth();
+  const mic = await permState("microphone");
+  const sound = await canPlaySound();
+  const camOk = settings.detector !== "camera" || (await permState("camera")) === "granted";
+  if (mic === "granted" && sound && camOk) return boot(false);
+  note(`waiting for a tap (mic ${mic}, sound ${sound ? "allowed" : "needs a tap"})`);
+  setPhase("needs-tap");
+  $("start").hidden = false;
 }
+$("start").addEventListener("click", () => boot(true));
+$("stage").addEventListener("click", (e) => { if (app.phase === "needs-tap" && e.target.id !== "banner") boot(true); });
 
-// ---- settings panel: triple-tap the status line ------------------------------------
-let taps = [];
-status.addEventListener("pointerdown", () => {
-  taps = taps.filter((t) => Date.now() - t < 900).concat(Date.now());
-  if (taps.length >= 3) { taps = []; openPanel(); }
-});
-$("b-close").onclick = () => { $("panel").hidden = true; };
-$("b-talk").onclick = () => { if (!armed) say("arm first"); else wake(); };
-$("b-hang").onclick = hangUp;
+// ---------------------------------------------------------------- settings panel
+const micTest = {
+  stream: null, ac: null, raf: 0,
+  async toggle() {
+    if (this.stream) return this.stop();
+    if (app.conversation) { note("mic test is off during a conversation"); return; }
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    this.ac = new AudioContext();
+    const an = this.ac.createAnalyser(); an.fftSize = 1024;
+    this.ac.createMediaStreamSource(this.stream).connect(an);
+    const buf = new Float32Array(an.fftSize);
+    const loop = () => {
+      an.getFloatTimeDomainData(buf);
+      let s = 0; for (const v of buf) s += v * v;
+      const rms = Math.sqrt(s / buf.length);
+      $("meter").style.width = Math.min(100, rms * 500) + "%";
+      $("r-mic").textContent = (20 * Math.log10(rms + 1e-6)).toFixed(0) + " dB";
+      window.skeletonMicLevel = rms;
+      this.raf = requestAnimationFrame(loop);
+    };
+    loop();
+  },
+  stop() {
+    cancelAnimationFrame(this.raf);
+    (this.stream?.getTracks() || []).forEach((t) => t.stop());
+    this.ac?.close(); this.stream = null; this.ac = null;
+    $("meter").style.width = "0"; $("r-mic").textContent = "off";
+  },
+};
 
-function openPanel() {
-  $("s-name").value = settings.name;
-  $("s-scare").value = settings.scare;
-  $("s-close").value = settings.close;
-  $("s-cool").value = settings.cooldown;
-  $("s-leave").value = settings.leave;
-  refreshReadouts();
-  $("panel").hidden = false;
+function fillPanel() {
+  $("s-name").value = settings.name; $("s-scare").value = settings.scare; $("s-det").value = settings.detector;
+  $("s-cm").value = settings.wakeCm; $("s-face").value = settings.faceClose; $("s-cool").value = settings.cooldown; $("s-leave").value = settings.leave;
+  readouts();
 }
-function refreshReadouts() {
+function readouts() {
   $("r-scare").textContent = settings.scare;
-  $("r-close").textContent = settings.close.toFixed(3);
+  $("r-cm").textContent = settings.wakeCm + " cm";
+  $("r-face").textContent = Number(settings.faceClose).toFixed(3);
   $("r-cool").textContent = settings.cooldown + " s";
   $("r-leave").textContent = settings.leave + " s";
+  $("r-pico").textContent = pico.connected ? `connected ${pico.version}` : "not connected";
 }
+$("gear").onclick = () => { fillPanel(); $("panel").hidden = false; };
+$("b-close").onclick = () => { micTest.stop(); $("panel").hidden = true; };
+$("b-pico").onclick = () => pairPico().then(readouts);
+$("b-talk").onclick = () => { if (!app.armed) note("not armed yet"); else { app.busyUntil = 0; app.needFresh = false; wake("Talk now button"); } };
+$("b-hang").onclick = () => hangUp("button");
+$("b-mic").onclick = () => micTest.toggle().catch((e) => note("mic test: " + e.message));
+$("b-reload").onclick = () => location.reload();
 $("s-name").oninput = (e) => { settings.name = e.target.value.trim() || DEFAULTS.skeleton_name; saveStore(); };
-$("s-scare").oninput = (e) => { settings.scare = Number(e.target.value); saveStore(); refreshReadouts(); };
-$("s-close").oninput = (e) => { settings.close = Number(e.target.value); saveStore(); refreshReadouts(); };
-$("s-cool").oninput = (e) => { settings.cooldown = Number(e.target.value); saveStore(); refreshReadouts(); };
-$("s-leave").oninput = (e) => { settings.leave = Number(e.target.value); saveStore(); refreshReadouts(); };
+$("s-scare").oninput = (e) => { settings.scare = Number(e.target.value); saveStore(); readouts(); };
+$("s-cm").oninput = (e) => { settings.wakeCm = Number(e.target.value); readouts(); };
+$("s-cm").onchange = () => { saveStore(); pico.send("wake " + settings.wakeCm); };
+$("s-face").oninput = (e) => { settings.faceClose = Number(e.target.value); saveStore(); readouts(); };
+$("s-cool").oninput = (e) => { settings.cooldown = Number(e.target.value); saveStore(); readouts(); };
+$("s-leave").oninput = (e) => { settings.leave = Number(e.target.value); saveStore(); readouts(); };
+$("s-det").onchange = async (e) => {
+  settings.detector = e.target.value; saveStore();
+  if (settings.detector === "camera") { try { await cam.start(); } catch (err) { note("camera: " + err.message); } }
+  else { cam.stop(); await pairPico(); }
+  readouts(); refreshHealth();
+};
 
-window.skeleton = { settings, wake, hangUp, get conversation() { return conversation; } };   // for remote debugging
-note("page loaded");
+window.skeleton = { settings, app, pico, cam, wake, hangUp, refreshHealth, get conversation() { return app.conversation; } };
+start();
 </script>
 </body>
 </html>
