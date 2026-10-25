@@ -113,7 +113,7 @@ const ECHO_TAIL_MS = 450;          // keep the mic shut this long after the skel
 const CONNECT_TIMEOUT_MS = 20000;
 const MAX_CALL_MS = 200000;
 const FRESH_ARRIVAL_MS = 2000;     // after a chat, nobody must be seen this long before the next wake
-const FRESH_ARRIVAL_MAX_MS = 60000;
+const FRESH_ARRIVAL_MAX_MS = 90000;
 const EYE_FOR = { booting: "sleep", "needs-tap": "sleep", sleeping: "sleep", connecting: "wake", listening: "listen", speaking: "speak" };
 
 const $ = (id) => document.getElementById(id);
@@ -482,7 +482,7 @@ function tick() {
   pico.eyes(EYE_FOR[app.phase] || "sleep");
 
   if (app.needFresh) {
-    if (!p.close) { app.freshSince ||= now; if (now - app.freshSince > FRESH_ARRIVAL_MS) app.needFresh = false; }
+    if (!p.seen) { app.freshSince ||= now; if (now - app.freshSince > FRESH_ARRIVAL_MS) app.needFresh = false; }   // the last visitor must actually leave
     else app.freshSince = 0;
     if (now - app.freshSetAt > FRESH_ARRIVAL_MAX_MS) app.needFresh = false;
   }
