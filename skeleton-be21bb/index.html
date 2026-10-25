@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Porch Skeleton</title>
+<style>
+  :root { --glow: #ff7a1a; --dim: #3a2410; --fg: #e9e2d3; }
+  html, body { height: 100%; margin: 0; background: #000; color: var(--fg); font: 600 18px/1.3 system-ui, sans-serif; overflow: hidden; -webkit-user-select: none; user-select: none; }
+  #stage { height: 100%; display: grid; grid-template-rows: 1fr auto auto; place-items: center; padding: 2vh 4vw; box-sizing: border-box; }
+  #skull { width: min(62vmin, 520px); height: auto; }
+  #skull .eye { fill: var(--dim); transition: fill .25s; }
+  #skull .jaw { transform-origin: 50% 0; }
+  body[data-state="sleeping"] .eye { animation: breathe 3.6s ease-in-out infinite; }
+  body[data-state="connecting"] .eye { fill: #b35a10; animation: flicker .18s steps(2) infinite; }
+  body[data-state="listening"] .eye { fill: var(--glow); }
+  body[data-state="speaking"] .eye { fill: #ffb060; animation: talkglow .5s ease-in-out infinite; }
+  body[data-state="speaking"] .jaw { animation: chatter .28s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { fill: var(--dim); } 50% { fill: #8a4a12; } }
+  @keyframes flicker { 0% { opacity: .5; } 100% { opacity: 1; } }
+  @keyframes talkglow { 0%,100% { fill: #ffb060; } 50% { fill: #ff6a00; } }
+  @keyframes chatter { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+  #status { font-size: clamp(16px, 2.6vmin, 24px); color: #9a9184; text-align: center; min-height: 1.4em; }
+  #arm { font-size: clamp(20px, 4vmin, 34px); font-weight: 800; padding: .6em 1.4em; border: 0; border-radius: 14px; background: var(--glow); color: #1a1206; margin-top: 1.5vh; }
+  #arm[hidden] { display: none; }
+  video { position: fixed; left: -9999px; width: 2px; height: 2px; }
+  #panel { position: fixed; inset: auto 0 0 0; max-height: 78vh; overflow: auto; background: #15121c; border-top: 2px solid var(--glow); padding: 14px 16px 24px; font-size: 16px; }
+  #panel[hidden] { display: none; }
+  #panel h2 { margin: 0 0 8px; font-size: 18px; color: var(--glow); }
+  #panel label { display: grid; grid-template-columns: 1fr 2fr auto; gap: 10px; align-items: center; padding: 6px 0; }
+  #panel input[type=range] { width: 100%; }
+  #panel input[type=text] { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid #444; background: #000; color: var(--fg); }
+  #panel .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  #panel button { font: inherit; font-weight: 700; padding: 8px 14px; border-radius: 8px; border: 1px solid #666; background: #222; color: var(--fg); }
+  #log { font: 12px/1.35 ui-monospace, monospace; color: #8f877a; white-space: pre-wrap; max-height: 22vh; overflow: auto; margin-top: 10px; }
+  .readout { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
+</style>
+</head>
+<body data-state="off">
+<main id="stage">
+  <svg id="skull" viewBox="0 0 120 130" role="img" aria-label="Skull">
+    <path d="M60 10c-26 0-44 18-44 42 0 14 6 24 14 30v14c0 4 3 6 6 6h6v-8h8v8h12v-8h8v8h6c3 0 6-2 6-6V82c8-6 14-16 14-30 0-24-18-42-36-42z" fill="#0b0b0e" stroke="#e9e2d3" stroke-width="3" stroke-linejoin="round"/>
+    <circle class="eye" cx="43" cy="54" r="11"/>
+    <circle class="eye" cx="77" cy="54" r="11"/>
+    <path d="M60 64l-6 12h12z" fill="#e9e2d3"/>
+    <g class="jaw">
+      <path d="M38 104h44v10c0 4-3 7-7 7H45c-4 0-7-3-7-7z" fill="#0b0b0e" stroke="#e9e2d3" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M48 104v8M56 104v8M64 104v8M72 104v8" stroke="#e9e2d3" stroke-width="2.5"/>
+    </g>
+  </svg>
+  <div id="status">tap to arm</div>
+  <button id="arm">ARM THE SKELETON</button>
+</main>
+
+<aside id="panel" hidden>
+  <h2>Skeleton settings</h2>
+  <label>Name <input id="s-name" type="text"> <span></span></label>
+  <label>Scare level <input id="s-scare" type="range" min="1" max="5" step="1"> <span class="readout" id="r-scare"></span></label>
+  <label>Wake when face is this big <input id="s-close" type="range" min="0.03" max="0.25" step="0.005"> <span class="readout" id="r-close"></span></label>
+  <label>Face size right now <span></span> <span class="readout" id="r-now">–</span></label>
+  <label>Quiet time after a chat (s) <input id="s-cool" type="range" min="5" max="90" step="5"> <span class="readout" id="r-cool"></span></label>
+  <label>Hang up when nobody is seen for (s) <input id="s-leave" type="range" min="5" max="60" step="5"> <span class="readout" id="r-leave"></span></label>
+  <div class="row">
+    <button id="b-talk">Talk now</button>
+    <button id="b-hang">Hang up</button>
+    <button id="b-close">Close</button>
+  </div>
+  <div id="log"></div>
+</aside>
+
+<video id="cam" autoplay muted playsinline></video>
+
+<script type="module">
+import { Conversation } from "https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.30.0/+esm";
+import { AGENT_ID, DEFAULTS } from "./config.js";
+
+const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21";
+const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
+const HOLD_FRAMES = 3;          // consecutive "close" detections before waking (about half a second)
+const FPS = 6;
+
+const $ = (id) => document.getElementById(id);
+const body = document.body, status = $("status"), video = $("cam"), log = $("log");
+
+// ---- settings (persisted on this tablet) -------------------------------------------
+const settings = Object.assign({
+  name: DEFAULTS.skeleton_name, scare: Number(DEFAULTS.scare_level) || 2,
+  close: 0.07, cooldown: 20, leave: 15,
+}, readStore());
+function readStore() { try { return JSON.parse(localStorage.getItem("skeleton") || "{}"); } catch { return {}; } }
+function saveStore() { try { localStorage.setItem("skeleton", JSON.stringify(settings)); } catch {} }
+
+function say(msg) { status.textContent = msg; }
+function note(msg) {
+  const line = `${new Date().toLocaleTimeString()}  ${msg}`;
+  console.log("[skeleton]", msg);
+  log.textContent = (line + "\n" + log.textContent).slice(0, 4000);
+}
+function setState(s) { body.dataset.state = s; }
+
+// ---- arming: permissions, camera, wake lock, detector ----------------------------
+let detector = null, armed = false, wakeLock = null;
+
+$("arm").onclick = async () => {
+  try {
+    say("asking for microphone…");
+    const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mic.getTracks().forEach((t) => t.stop());                     // permission granted; the SDK opens its own
+    say("asking for camera…");
+    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
+    await video.play();
+    await keepAwake();
+    try { await document.documentElement.requestFullscreen(); } catch {}
+    $("arm").hidden = true;
+    say("loading eyes…");
+    await loadDetector();
+    armed = true;
+    setState("sleeping");
+    say("watching the porch…");
+    note(`armed. agent ${AGENT_ID.slice(0, 8)}…, detector ${detector ? "face" : "motion"}`);
+    setInterval(tick, 1000 / FPS);
+  } catch (e) {
+    say("could not arm: " + (e.message || e));
+    note("arm failed: " + e);
+  }
+};
+
+async function keepAwake() {
+  try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) { note("no wake lock: " + e.message); }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && armed) keepAwake(); });
+
+async function loadDetector() {
+  try {
+    const { FaceDetector, FilesetResolver } = await import(MP + "/vision_bundle.mjs");
+    const vision = await FilesetResolver.forVisionTasks(MP + "/wasm");
+    detector = await FaceDetector.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: FACE_MODEL, delegate: "GPU" },
+      runningMode: "VIDEO", minDetectionConfidence: 0.5,
+    });
+  } catch (e) {
+    note("face detector unavailable, using motion: " + e.message);
+    detector = null;
+  }
+}
+
+// ---- presence loop -----------------------------------------------------------------
+const canvas = document.createElement("canvas"); canvas.width = 32; canvas.height = 24;
+const ctx = canvas.getContext("2d", { willReadFrequently: true });
+let lastFrame = null, closeStreak = 0, lastSeen = 0, busyUntil = 0, conversation = null, starting = false;
+
+function faceSize() {
+  if (!detector || !video.videoWidth) return null;
+  const res = detector.detectForVideo(video, performance.now());
+  let best = 0;
+  for (const d of res.detections || []) {
+    const w = d.boundingBox.width / video.videoWidth;
+    if (w > best) best = w;
+  }
+  return best;
+}
+
+function motionScore() {
+  if (!video.videoWidth) return 0;
+  ctx.drawImage(video, 0, 0, 32, 24);
+  const f = ctx.getImageData(0, 0, 32, 24).data;
+  let diff = 0;
+  if (lastFrame) for (let i = 0; i < f.length; i += 4) diff += Math.abs(f[i] - lastFrame[i]);
+  lastFrame = f;
+  return diff / (f.length / 4);
+}
+
+function tick() {
+  const now = Date.now();
+  let close;
+  if (detector) {
+    const size = faceSize();
+    $("r-now").textContent = size.toFixed(3);
+    close = size >= settings.close;
+    if (size > 0.02) lastSeen = now;              // any face at all counts as "someone is around"
+  } else {
+    const m = motionScore();
+    $("r-now").textContent = m.toFixed(1);
+    close = m > 25;
+    if (close) lastSeen = now;
+  }
+
+  if (conversation || starting) {
+    if (now - lastSeen > settings.leave * 1000) { note("nobody seen, hanging up"); hangUp(); }
+    return;
+  }
+  if (now < busyUntil) return;
+  closeStreak = close ? closeStreak + 1 : 0;
+  if (closeStreak >= HOLD_FRAMES) wake();
+}
+
+// ---- the conversation ---------------------------------------------------------------
+async function wake() {
+  if (conversation || starting) return;
+  starting = true; closeStreak = 0; lastSeen = Date.now();
+  setState("connecting"); say("someone's here…");
+  try {
+    conversation = await Conversation.startSession({
+      agentId: AGENT_ID,
+      connectionType: "websocket",
+      dynamicVariables: { skeleton_name: settings.name, scare_level: String(settings.scare) },
+      onConnect: () => { setState("listening"); say(`${settings.name} is awake`); note("connected"); },
+      onModeChange: ({ mode }) => { setState(mode === "speaking" ? "speaking" : "listening"); },
+      onDisconnect: () => {
+        conversation = null;
+        busyUntil = Date.now() + settings.cooldown * 1000;
+        setState("sleeping"); say("watching the porch…"); note("disconnected, cooling down");
+      },
+      onError: (err) => { note("error: " + (err?.message || JSON.stringify(err))); },
+    });
+  } catch (e) {
+    note("could not start: " + (e.message || e));
+    busyUntil = Date.now() + 10000;
+    setState("sleeping"); say("watching the porch…");
+  } finally {
+    starting = false;
+  }
+}
+
+async function hangUp() {
+  if (!conversation) return;
+  const c = conversation; conversation = null;
+  try { await c.endSession(); } catch (e) { note("hangup error: " + e.message); }
+  busyUntil = Date.now() + settings.cooldown * 1000;
+  setState("sleeping"); say("watching the porch…");
+}
+
+// ---- settings panel: triple-tap the status line ------------------------------------
+let taps = [];
+status.addEventListener("pointerdown", () => {
+  taps = taps.filter((t) => Date.now() - t < 900).concat(Date.now());
+  if (taps.length >= 3) { taps = []; openPanel(); }
+});
+$("b-close").onclick = () => { $("panel").hidden = true; };
+$("b-talk").onclick = () => { if (!armed) say("arm first"); else wake(); };
+$("b-hang").onclick = hangUp;
+
+function openPanel() {
+  $("s-name").value = settings.name;
+  $("s-scare").value = settings.scare;
+  $("s-close").value = settings.close;
+  $("s-cool").value = settings.cooldown;
+  $("s-leave").value = settings.leave;
+  refreshReadouts();
+  $("panel").hidden = false;
+}
+function refreshReadouts() {
+  $("r-scare").textContent = settings.scare;
+  $("r-close").textContent = settings.close.toFixed(3);
+  $("r-cool").textContent = settings.cooldown + " s";
+  $("r-leave").textContent = settings.leave + " s";
+}
+$("s-name").oninput = (e) => { settings.name = e.target.value.trim() || DEFAULTS.skeleton_name; saveStore(); };
+$("s-scare").oninput = (e) => { settings.scare = Number(e.target.value); saveStore(); refreshReadouts(); };
+$("s-close").oninput = (e) => { settings.close = Number(e.target.value); saveStore(); refreshReadouts(); };
+$("s-cool").oninput = (e) => { settings.cooldown = Number(e.target.value); saveStore(); refreshReadouts(); };
+$("s-leave").oninput = (e) => { settings.leave = Number(e.target.value); saveStore(); refreshReadouts(); };
+
+window.skeleton = { settings, wake, hangUp, get conversation() { return conversation; } };   // for remote debugging
+note("page loaded");
+</script>
+</body>
+</html>
