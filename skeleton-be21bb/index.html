@@ -392,7 +392,7 @@ function onEnded(details) {
 }
 
 async function wake(reason) {
-  if (app.conversation || app.starting) return;
+  if (app.retired || app.conversation || app.starting) return;
   if (!(await loadSdk())) return;
   app.starting = true; app.closeStreak = 0; app.lastSeen = Date.now();
   app.micMuted = true; app.mutedSince = Date.now();
@@ -515,6 +515,7 @@ async function pairPico() {
 }
 
 async function boot(fromTap) {
+  if (app.retired) return;
   $("start").hidden = true;
   setPhase("booting");
   // the Pico permission prompt needs this tap, and fullscreen would use it up, so the Pico goes first
@@ -615,6 +616,24 @@ $("s-det").onchange = async (e) => {
   else { cam.stop(); await pairPico(); }
   readouts(); refreshHealth();
 };
+
+// ---------------------------------------------------------------- one copy only
+// A second copy of this page (another tab, or an old tab left behind after an update) would fight
+// over the Pico. Every new copy tells the older ones to let go and stop.
+function retire() {
+  if (app.retired) return;
+  app.retired = true; app.armed = false;
+  clearInterval(app.ticker); app.ticker = 0;
+  hangUp("another copy of the page took over");
+  if (pico.connected) { const d = pico.dev; pico.connected = false; pico.dev = null; try { d && d.close(); } catch {} }
+  ui.status("paused: the skeleton is running in another tab");
+  ui.banner("This tab stopped because the skeleton page is open in another tab.");
+}
+if ("BroadcastChannel" in window) {
+  const channel = new BroadcastChannel("porch-skeleton");
+  channel.onmessage = (e) => { if (e.data === "takeover") retire(); };
+  channel.postMessage("takeover");
+}
 
 window.skeleton = { settings, app, pico, cam, sonar, wake, hangUp, refreshHealth, get conversation() { return app.conversation; } };
 start();
