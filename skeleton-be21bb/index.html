@@ -223,7 +223,7 @@ const pico = {
     let m; try { m = JSON.parse(line); } catch { return; }
     this.lastMsg = Date.now();
     if (m.hello) { this.version = m.v; note(`Pico firmware ${m.v}, wakes within ${m.wake} cm`); }
-    if ("on" in m) { this.on = !!m.on; this.cm = m.cm; }
+    if ("on" in m) { this.on = !!m.on; this.cm = m.cm; sonar.add(m.cm); }
     if (m.err) note("Pico error: " + m.err);
   },
   async send(text) {
@@ -239,7 +239,7 @@ const pico = {
   },
   lost(why) {
     if (!this.connected) return;
-    this.connected = false; this.on = false; this.cm = null;
+    this.connected = false; this.on = false; this.cm = null; sonar.reset();
     note("Pico lost: " + why);
     try { this.dev && this.dev.close(); } catch {}
     this.dev = null;
@@ -252,6 +252,29 @@ if (navigator.usb) {
   });
   navigator.usb.addEventListener("disconnect", (e) => { if (pico.dev === e.device) pico.lost("unplugged"); });
 }
+
+// ---------------------------------------------------------------- Pico presence (self-calibrating)
+// The sensor also sees walls and furniture. Learn that empty-scene distance and only wake for
+// something clearly closer than it, and never farther than the "wake within" setting.
+const BG_MARGIN_CM = 25, BG_SAMPLES = 120, NEAR_HOLD = 2, LEAVE_MS = 2500, RELEARN_MS = 180000;
+const sonar = {
+  bg: [], present: false, nearStreak: 0, lastNear: 0, presentSince: 0, background: null, threshold: null,
+  add(cm) {                       // one call per Pico report, about 4 a second
+    const now = Date.now();
+    if (!this.present) { this.bg.push(cm == null ? 400 : cm); if (this.bg.length > BG_SAMPLES) this.bg.shift(); }
+    else if (now - this.presentSince > RELEARN_MS) { this.reset(); note("sensor: someone stood there 3 minutes, re-learning the empty porch"); return; }
+    if (this.bg.length < 8) { this.threshold = null; return; }   // first 2 seconds: learning
+    const sorted = [...this.bg].sort((x, y) => x - y);
+    this.background = sorted[Math.floor(sorted.length * 0.75)];
+    this.threshold = Math.max(20, Math.min(settings.wakeCm, this.background - BG_MARGIN_CM));
+    const near = cm != null && cm < this.threshold;
+    if (cm != null && cm < this.threshold + 15) this.lastNear = now;
+    this.nearStreak = near ? this.nearStreak + 1 : 0;
+    if (!this.present && this.nearStreak >= NEAR_HOLD) { this.present = true; this.presentSince = now; }
+    else if (this.present && now - this.lastNear > LEAVE_MS) this.present = false;
+  },
+  reset() { this.bg = []; this.present = false; this.nearStreak = 0; this.threshold = null; this.background = null; },
+};
 
 // ---------------------------------------------------------------- camera fallback
 const cam = {
@@ -298,10 +321,12 @@ const cam = {
 // ---------------------------------------------------------------- presence
 function readPresence(now) {
   if (pico.connected) {
-    const fresh = now - pico.lastMsg < 3000;
-    const on = fresh && pico.on;
-    const where = !fresh ? "Pico is silent" : pico.cm == null ? "nobody in range" : `${pico.cm} cm`;
-    return { close: on, seen: on, hold: 1, readout: `Pico: ${where}${on ? " · someone here" : ""}` };
+    if (now - pico.lastMsg > 3000) return { close: false, seen: false, hold: 99, readout: "Pico: no data" };
+    const on = sonar.present;
+    const dist = pico.cm == null ? "nothing in range" : `${pico.cm} cm`;
+    const rule = sonar.threshold == null ? "learning the empty porch…"
+      : `wakes under ${sonar.threshold} cm (empty: ${sonar.background >= 400 ? "open space" : sonar.background + " cm"})`;
+    return { close: on, seen: on, hold: 1, readout: `Pico: ${dist} · ${rule}${on ? " · someone here" : ""}` };
   }
   if (cam.on && cam.detector) {
     const size = cam.faceSize();
@@ -492,11 +517,13 @@ async function pairPico() {
 async function boot(fromTap) {
   $("start").hidden = true;
   setPhase("booting");
-  if (fromTap) { try { await document.documentElement.requestFullscreen(); } catch {} }
-  loadSdk().then(refreshHealth);
+  // the Pico permission prompt needs this tap, and fullscreen would use it up, so the Pico goes first
   if (settings.detector === "pico") {
     try { await pico.connect(fromTap); } catch (e) { note("Pico: " + (e.message || e)); }
-  } else {
+  }
+  if (fromTap) { try { await document.documentElement.requestFullscreen(); } catch {} }
+  loadSdk().then(refreshHealth);
+  if (settings.detector !== "pico") {
     try { await cam.start(); } catch (e) { note("camera: " + e.message); }
   }
   try {
@@ -589,7 +616,7 @@ $("s-det").onchange = async (e) => {
   readouts(); refreshHealth();
 };
 
-window.skeleton = { settings, app, pico, cam, wake, hangUp, refreshHealth, get conversation() { return app.conversation; } };
+window.skeleton = { settings, app, pico, cam, sonar, wake, hangUp, refreshHealth, get conversation() { return app.conversation; } };
 start();
 </script>
 </body>
