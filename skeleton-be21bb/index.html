@@ -268,7 +268,7 @@ const sonar = {
     this.background = sorted[Math.floor(sorted.length * 0.75)];
     this.threshold = Math.max(20, Math.min(settings.wakeCm, this.background - BG_MARGIN_CM));
     const near = cm != null && cm < this.threshold;
-    if (cm != null && cm < this.threshold + 15) this.lastNear = now;
+    if (cm != null && cm < Math.min(this.threshold + 15, this.background - 10)) this.lastNear = now;   // clearly gone once back near the empty view
     this.nearStreak = near ? this.nearStreak + 1 : 0;
     if (!this.present && this.nearStreak >= NEAR_HOLD) { this.present = true; this.presentSince = now; }
     else if (this.present && now - this.lastNear > LEAVE_MS) this.present = false;
